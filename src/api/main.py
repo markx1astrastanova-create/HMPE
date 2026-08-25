@@ -1,6 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import numpy as np
+import pandas as pd
+from typing import Optional
 
 from src.data_layer.provider import YahooFinanceProvider
 from src.data_layer.storage import ParquetStorage, update_price_history
@@ -24,28 +27,33 @@ def health_check():
     return {"status": "ok", "message": "HMPE Backend is running"}
 
 @app.get("/price-history")
-def get_price_history(symbol: str, update: bool = False):
+def get_price_history(symbol: str, start: Optional[str] = Query(None), end: Optional[str] = Query(None)):
     """
     Retrieve the historical price data for a symbol.
-    If 'update' is True or data does not exist, it will fetch updates first.
+    Does NOT trigger external downloads.
     """
     symbol = symbol.strip().upper()
     
-    # Try to load existing data
+    # Load existing data
     df = storage.load_dataset(symbol)
     
-    # If forced update or no data exists, do an update
-    if update or df.empty:
-        df = update_price_history(symbol, provider, storage)
-    
     if df.empty:
-        raise HTTPException(status_code=404, detail=f"No historical data found for {symbol}")
+        raise HTTPException(status_code=404, detail=f"No local historical data found for {symbol}. Run an update first.")
+
+    # Apply date filters if provided
+    if start:
+        df = df[df['Date'] >= pd.to_datetime(start)]
+    if end:
+        df = df[df['Date'] <= pd.to_datetime(end)]
+
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"No data found for {symbol} in the given date range.")
 
     # Convert Date to string for JSON serialization
     df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
     
-    # Fill NaN to avoid JSON errors
-    df = df.fillna(0)
+    # Replace NaN with None so it serializes to JSON null instead of 0
+    df = df.replace({np.nan: None})
     
     # Return as list of dictionaries
     return df.to_dict(orient="records")

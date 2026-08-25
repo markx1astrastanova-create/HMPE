@@ -20,11 +20,11 @@ class YahooFinanceProvider(MarketDataProvider):
         try:
             ticker = yf.Ticker(symbol)
             if start and end:
-                df = ticker.history(start=start, end=end, interval=interval)
+                df = ticker.history(start=start, end=end, interval=interval, auto_adjust=True)
             elif start:
-                df = ticker.history(start=start, interval=interval)
+                df = ticker.history(start=start, interval=interval, auto_adjust=True)
             else:
-                df = ticker.history(period="max", interval=interval)
+                df = ticker.history(period="max", interval=interval, auto_adjust=True)
 
             if df.empty:
                 logger.warning(f"No data returned for {symbol} from Yahoo Finance.")

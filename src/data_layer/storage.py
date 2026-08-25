@@ -73,7 +73,8 @@ def update_price_history(symbol: str, provider: MarketDataProvider, storage: Par
     combined = pd.concat([existing_df, new_data], ignore_index=True)
     valid_df = validate_ohlcv(combined, symbol)
     
-    if len(valid_df) > len(existing_df) or valid_df['Date'].max() > latest_date:
+    # Compare against existing data using equals()
+    if not valid_df.equals(existing_df):
         logger.info(f"Saving updated dataset for {symbol} ({len(valid_df)} rows total)")
         storage.save_dataset(symbol, valid_df)
     else:
